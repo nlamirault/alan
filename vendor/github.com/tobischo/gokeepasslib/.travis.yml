@@ -1,0 +1,10 @@
+language: go
+
+install: true
+
+script: go test
+
+go:
+  - 1.7
+  - 1.8
+  - tip

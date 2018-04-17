@@ -1,0 +1,153 @@
+# Copyright (C) 2018 Nicolas Lamirault <nicolas.lamirault@gmail.com>
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+variables:
+  REGISTRY: "registry.gitlab.com"
+  NAME: "nlamirault/alan"
+  DOCKER_DRIVER: overlay
+  BINTRAY_URI: "https://api.bintray.com"
+  BINTRAY_USERNAME: "nlamirault"
+  BINTRAY_ORG: "nlamirault"
+  BINTRAY_REPOSITORY: "oss"
+
+stages:
+  - build
+  - test
+  - deploy
+  - package
+  - publish
+
+image: docker:git
+
+services:
+  - docker:dind
+
+.docker_tag: &docker_tag |
+  docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "$CI_REGISTRY"
+  export VERSION=${CI_BUILD_TAG}
+  if [[ "${VERSION}" == "" ]]; then export VERSION="latest"; fi
+  echo ${VERSION}
+
+.prepare_build: &prepare_build |
+  mkdir -p /go/src/github.com/nlamirault/
+  cd /go/src/github.com/nlamirault/ && ln -s /builds/nicolas-lamirault/alan .
+  cd /go/src/github.com/nlamirault/alan
+
+build_docker:
+  stage: build
+  script:
+    - *docker_tag
+    - docker build -t "$CI_REGISTRY_IMAGE:latest" .
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+
+test_docker:
+  stage: test
+  script:
+    - *docker_tag
+    - docker build -t "$CI_REGISTRY_IMAGE:${VERSION}" .
+    - docker run --rm ${CI_REGISTRY_IMAGE}:${VERSION} version
+
+deploy_docker:
+  stage: deploy
+  script:
+    - *docker_tag
+    - docker build -t "$CI_REGISTRY_IMAGE:${VERSION}" .
+    - docker push "$CI_REGISTRY_IMAGE:${VERSION}"
+  only:
+    - tags
+
+package_linux:
+  stage: package
+  image: golang:1.9
+  script:
+    - *prepare_build
+    - APP=alan
+    - GOOS=linux
+    - for GOARCH in amd64 arm; do go build -v -o $APP-$GOOS-$GOARCH github.com/nlamirault/alan/cmd; done
+    - mkdir binaries && mv alan-$GOOS-* binaries
+    - ls binaries
+  artifacts:
+    paths:
+      - binaries/
+    expire_in: 1 week
+        #only:
+        #- tags
+
+# package_bsd:
+#   stage: package
+#   image: golang:1.9
+#   script:
+#     - *prepare_build
+#     - for APP in aland alanctl alanadm; do for GOOS in darwin dragonfly freebsd netbsd openbsd; do for GOARCH in amd64; do go build -v -o $APP-$GOOS-$GOARCH github.com/nlamirault/alan/cmd/$APP; done; done; done
+#     - mkdir binaries && mv alanctl-* binaries/ &&  mv alanadm-* binaries/ && mv aland-* binaries/
+#     - ls binaries
+#   artifacts:
+#     paths:
+#       - binaries/
+#     expire_in: 1 week
+#   only:
+#     - tags
+
+package_windows:
+  stage: package
+  image: golang:1.9
+  script:
+    - *prepare_build
+    - APP=alan
+    - GOOS=windows
+    - for GOARCH in 386 amd64 arm; do go build -v -o $APP-$GOOS-$GOARCH github.com/nlamirault/alan; done
+    - mkdir binaries && mv alan-$GOOS-* binaries/
+    - ls binaries
+  artifacts:
+    paths:
+      - binaries/
+    expire_in: 1 week
+        #only:
+        #- tags
+
+package_darwin:
+  stage: package
+  image: golang:1.9
+  script:
+    - *prepare_build
+    - APP=alan
+    - GOOS=darwin
+    - for GOARCH in 386 amd64 arm; do go build -v -o $APP-$GOOS-$GOARCH github.com/nlamirault/alan; done
+    - mkdir binaries && mv alan-$GOOS-* binaries
+    - ls binaries
+  artifacts:
+    paths:
+      - binaries/
+    expire_in: 1 week
+        #only:
+        #- tags
+
+# publish_bintray:
+#   stage: publish
+#   image: debian:latest
+#   dependencies:
+#     - package_linux
+#     # - package_bsd
+#     - package_darwin
+#     - package_windows
+#   before_script:
+#     - "apt-get update && apt-get install -y curl"
+#     - echo "$BINTRAY_USERNAME"
+#   script:
+#     - ls binaries
+#     - echo "$BINTRAY_USERNAME"
+#     - echo "$BINTRAY_URI/content/$BINTRAY_ORG/$BINTRAY_REPOSITORY/$APP/$VERSION"
+#     - cd binaries && for file in $(ls); do echo $file; curl -T $file -u ${BINTRAY_USERNAME}:${BINTRAY_APIKEY} ${BINTRAY_URI}/content/${BINTRAY_ORG}/${BINTRAY_REPOSITORY}/${APP}/${VERSION}/$i;publish=1; done
+#   # only:
+#   #   - tags

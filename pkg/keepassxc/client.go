@@ -62,9 +62,7 @@ func (client *Client) Open() error {
 	glog.V(2).Infof("Database Metadata: %#v", client.db.Content.Meta)
 
 	glog.V(2).Info("Unlock database entries")
-	client.db.UnlockProtectedEntries()
-
-	return nil
+	return client.db.UnlockProtectedEntries()
 }
 
 func (client *Client) Save() error {
@@ -119,14 +117,14 @@ func (client *Client) Create(secrets map[string][]*pkgalan.Secret) error {
 
 	rootGroup := gokeepasslib.NewGroup()
 	rootGroup.Name = "Root"
-	rootGroup.EnableSearching = "true"
-	rootGroup.EnableAutoType = "true"
+	// rootGroup.EnableSearching = "true"
+	// rootGroup.EnableAutoType = "true"
 	for groupName, groupSecrets := range secrets {
 		glog.V(2).Infof("Add group secrets: %s %s", groupName, groupSecrets)
 		subGroup := gokeepasslib.NewGroup()
 		subGroup.Name = strings.Replace(groupName, "/", "", -1)
-		subGroup.EnableSearching = "true"
-		subGroup.EnableAutoType = "true"
+		// subGroup.EnableSearching = "true"
+		// subGroup.EnableAutoType = "true"
 		for _, secret := range groupSecrets {
 			entry := gokeepasslib.NewEntry()
 			entry.Values = append(entry.Values, mkValue(pkgalan.Title, secret.Title))
@@ -147,8 +145,8 @@ func (client *Client) Create(secrets map[string][]*pkgalan.Secret) error {
 	meta := gokeepasslib.NewMetaData()
 	meta.Generator = pkgalan.Generator
 	meta.HistoryMaxItems = 10
-	meta.MaintenanceHistoryDays = "365"
-	meta.HistoryMaxSize = 6291456
+	// meta.MaintenanceHistoryDays = "365"
+	// meta.HistoryMaxSize = 6291456
 	client.db = &gokeepasslib.Database{
 		Signature:   &gokeepasslib.DefaultSig,
 		Headers:     gokeepasslib.NewFileHeaders(),
